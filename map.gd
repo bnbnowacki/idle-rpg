@@ -24,20 +24,25 @@ const MOB_SPAWN_POINTS := [
 	Vector2(1010, 520), Vector2(1008, 145)
 ]
 
+const MAX_MOBS: int = 1
 var mob_spawn_timer: float = 5.0
 var mob_spawn_index: int = 0
 var coins: int = 0
 var upgrade_levels: Array[int] = [0, 0, 0]
 var coin_label: Label
 var upgrade_buttons: Array[Button] = []
+var combat_log_button: Button
+var combat_log_panel: PanelContainer
+var combat_log_text: TextEdit
 
 func _ready() -> void:
 	_create_hud()
+	_connect_combat_log()
 	queue_redraw()
 
 func _process(delta: float) -> void:
 	mob_spawn_timer -= delta
-	if mob_spawn_timer <= 0.0:
+	if mob_spawn_timer <= 0.0 and get_tree().get_nodes_in_group("mobs").size() < MAX_MOBS:
 		_spawn_mob()
 		mob_spawn_timer = 5.0
 
@@ -101,7 +106,98 @@ func _create_hud() -> void:
 		button_row.add_child(button)
 		upgrade_buttons.append(button)
 
+	_create_combat_log_ui(hud_root)
 	_refresh_hud()
+
+func _create_combat_log_ui(hud_root: Control) -> void:
+	if not _debug_mode_enabled():
+		return
+
+	combat_log_button = Button.new()
+	combat_log_button.text = "Combat log"
+	combat_log_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	combat_log_button.offset_left = -180.0
+	combat_log_button.offset_top = 18.0
+	combat_log_button.offset_right = -20.0
+	combat_log_button.offset_bottom = 58.0
+	combat_log_button.add_theme_font_size_override("font_size", 16)
+	combat_log_button.add_theme_color_override("font_color", Color("#fff9e8"))
+	combat_log_button.add_theme_stylebox_override("normal", _make_button_style(Color("#6e789c"), Color("#d2ae68")))
+	combat_log_button.add_theme_stylebox_override("hover", _make_button_style(Color("#8793bd"), Color.WHITE))
+	combat_log_button.add_theme_stylebox_override("pressed", _make_button_style(Color("#515b7e"), Color("#d2ae68")))
+	combat_log_button.pressed.connect(_toggle_combat_log)
+	hud_root.add_child(combat_log_button)
+
+	combat_log_panel = PanelContainer.new()
+	combat_log_panel.name = "CombatLogPopup"
+	combat_log_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	combat_log_panel.offset_left = -430.0
+	combat_log_panel.offset_top = 72.0
+	combat_log_panel.offset_right = -20.0
+	combat_log_panel.offset_bottom = 610.0
+	combat_log_panel.visible = false
+	combat_log_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.12, 0.16, 0.22, 0.97), Color("#d2ae68")))
+	hud_root.add_child(combat_log_panel)
+
+	var panel_content: VBoxContainer = VBoxContainer.new()
+	panel_content.add_theme_constant_override("separation", 8)
+	combat_log_panel.add_child(panel_content)
+
+	var header: HBoxContainer = HBoxContainer.new()
+	header.custom_minimum_size = Vector2(0.0, 36.0)
+	panel_content.add_child(header)
+
+	var title: Label = Label.new()
+	title.text = "Combat log"
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", Color("#fff9e8"))
+	header.add_child(title)
+
+	var close_button: Button = Button.new()
+	close_button.text = "×"
+	close_button.custom_minimum_size = Vector2(36.0, 32.0)
+	close_button.add_theme_font_size_override("font_size", 22)
+	close_button.pressed.connect(_close_combat_log)
+	header.add_child(close_button)
+
+	combat_log_text = TextEdit.new()
+	combat_log_text.custom_minimum_size = Vector2(380.0, 470.0)
+	combat_log_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	combat_log_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	combat_log_text.editable = false
+	combat_log_text.placeholder_text = "Brak wpisów."
+	combat_log_text.add_theme_font_size_override("font_size", 15)
+	combat_log_text.add_theme_color_override("font_color", Color("#fff9e8"))
+	combat_log_text.add_theme_color_override("font_readonly_color", Color("#fff9e8"))
+	panel_content.add_child(combat_log_text)
+
+func _connect_combat_log() -> void:
+	var combat_system: Node = get_node_or_null("/root/CombatSystem")
+	if combat_system != null and combat_system.has_signal("combat_log_entry"):
+		combat_system.connect("combat_log_entry", Callable(self, "_on_combat_log_entry"))
+
+func _toggle_combat_log() -> void:
+	if is_instance_valid(combat_log_panel):
+		combat_log_panel.visible = not combat_log_panel.visible
+
+func _close_combat_log() -> void:
+	if is_instance_valid(combat_log_panel):
+		combat_log_panel.visible = false
+
+func _on_combat_log_entry(frame_number: int, lines: Array) -> void:
+	if not _debug_mode_enabled() or not is_instance_valid(combat_log_text):
+		return
+
+	var entry_lines: PackedStringArray = PackedStringArray(["klatka nr %d:" % frame_number])
+	for line in lines:
+		entry_lines.append(str(line))
+	var entry: String = "\n".join(entry_lines)
+	if not combat_log_text.text.is_empty():
+		combat_log_text.text += "\n\n"
+	combat_log_text.text += entry
+	combat_log_text.set_deferred("scroll_vertical", 999999)
 
 func _refresh_hud() -> void:
 	if not is_instance_valid(coin_label):
@@ -133,6 +229,10 @@ func _on_upgrade_pressed(index: int) -> void:
 	if knight.has_method("queue_redraw"):
 		knight.queue_redraw()
 	_refresh_hud()
+
+func _debug_mode_enabled() -> bool:
+	var globals_node: Node = get_node_or_null("/root/Globals")
+	return globals_node != null and int(globals_node.get("debug_mode")) == 1
 
 func _make_panel_style(background: Color, border: Color) -> StyleBoxFlat:
 	var style: StyleBoxFlat = StyleBoxFlat.new()

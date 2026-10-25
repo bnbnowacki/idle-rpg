@@ -11,77 +11,48 @@ const SKIN := Color("#f1bf91")
 const OUTLINE := Color("#354455")
 var turn_timer: float = 0.0
 var walk_time: float = 0.0
-var target: Node2D
-var target_refresh_timer: float = 0.0
-var is_dead: bool = false
 var respawn_timer: float = 0.0
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 func _ready() -> void:
 	rng.seed = 73421
 	hp = max_hp
+	target_group = &"mobs"
+	target_scan_range = -1.0
+	target_refresh_interval = 0.2
 	add_to_group("player")
 	_choose_direction()
 	queue_redraw()
 
-func _process(delta: float) -> void:
-	if is_dead:
-		respawn_timer -= delta
-		if respawn_timer <= 0.0:
-			_respawn()
-		return
-
-	walk_time += delta
+func _move_without_target(delta: float) -> void:
 	turn_timer -= delta
-	target_refresh_timer -= delta
-	if target_refresh_timer <= 0.0:
-		target = _find_nearest_mob()
-		target_refresh_timer = 0.2
+	var at_edge: bool = (
+		position.x <= WALK_BOUNDS.position.x or
+		position.x >= WALK_BOUNDS.end.x or
+		position.y <= WALK_BOUNDS.position.y or
+		position.y >= WALK_BOUNDS.end.y
+	)
+	if turn_timer <= 0.0 or at_edge:
+		_choose_direction()
+	_queue_movement(direction * speed * delta)
 
-	if is_instance_valid(target):
-		var to_target: Vector2 = target.global_position - global_position
-		if to_target.length() > ATTACK_RANGE:
-			direction = to_target.normalized()
-			position += direction * speed * delta
-		else:
-			direction = Vector2.ZERO
-			_try_attack_target(delta)
-	else:
-		var at_edge: bool = (
-			position.x <= WALK_BOUNDS.position.x or
-			position.x >= WALK_BOUNDS.end.x or
-			position.y <= WALK_BOUNDS.position.y or
-			position.y >= WALK_BOUNDS.end.y
-		)
-		if turn_timer <= 0.0 or at_edge:
-			_choose_direction()
-		position += direction * speed * delta
-
-	position.x = clampf(position.x, WALK_BOUNDS.position.x, WALK_BOUNDS.end.x)
-	position.y = clampf(position.y, WALK_BOUNDS.position.y, WALK_BOUNDS.end.y)
-	if abs(direction.x) > 0.08:
-		facing = sign(direction.x)
-	queue_redraw()
-
-func _try_attack_target(delta: float) -> void:
-	attack_timer -= delta
-	if attack_timer > 0.0 or not is_instance_valid(target):
-		return
-	var target_defense: int = int(target.get("defense"))
-	var damage: int = maxi(attack - target_defense, 0)
-	target.call("take_damage", damage)
-	attack_timer = 1.0 / maxf(attack_speed, 0.1)
+func _update_animation(delta: float) -> void:
+	walk_time += delta
 
 func _on_defeated() -> void:
-	is_dead = true
 	hp = 0
 	respawn_timer = 3.0
 	target = null
 	direction = Vector2.ZERO
 	visible = false
 
+func _process_defeated(delta: float) -> void:
+	respawn_timer -= delta
+	if respawn_timer <= 0.0:
+		_respawn()
+
 func _respawn() -> void:
-	is_dead = false
+	is_defeated = false
 	hp = max_hp
 	position = Vector2(
 		rng.randf_range(WALK_BOUNDS.position.x, WALK_BOUNDS.end.x),
@@ -92,19 +63,6 @@ func _respawn() -> void:
 	visible = true
 	_choose_direction()
 	queue_redraw()
-
-func _find_nearest_mob() -> Node2D:
-	var nearest: Node2D
-	var nearest_distance: float = INF
-	for mob_node in get_tree().get_nodes_in_group("mobs"):
-		if not mob_node is Node2D:
-			continue
-		var mob: Node2D = mob_node as Node2D
-		var distance: float = global_position.distance_squared_to(mob.global_position)
-		if distance < nearest_distance:
-			nearest = mob
-			nearest_distance = distance
-	return nearest
 
 func _choose_direction() -> void:
 	var angle: float = rng.randf_range(-PI, PI)

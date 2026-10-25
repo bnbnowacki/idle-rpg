@@ -17,42 +17,18 @@ var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 func _ready() -> void:
 	rng.seed = int(Time.get_ticks_msec()) + int(position.x * 31.0) + int(position.y * 17.0)
 	hp = max_hp
+	target_group = &"player"
+	target_scan_range = AGGRO_RANGE
+	target_refresh_interval = 0.2
 	idle_timer = rng.randf_range(3.0, 4.0)
 	direction = Vector2.ZERO
 	add_to_group("mobs")
 	queue_redraw()
 
-func _process(delta: float) -> void:
+func _update_animation(delta: float) -> void:
 	pulse_time += delta
-	attack_timer -= delta
-	var player: Node2D = _find_player()
-	if is_instance_valid(player) and player.visible:
-		var to_player: Vector2 = player.global_position - global_position
-		var player_distance: float = to_player.length()
-		if player_distance <= AGGRO_RANGE:
-			if player_distance > ATTACK_RANGE:
-				direction = to_player.normalized()
-				position += direction * speed * delta
-			else:
-				direction = Vector2.ZERO
-				_try_attack_player(player)
-			_clamp_to_map()
-			_update_facing()
-			queue_redraw()
-			return
 
-	_update_wander(delta)
-	queue_redraw()
-
-func _try_attack_player(player: Node2D) -> void:
-	if attack_timer > 0.0:
-		return
-	var player_defense: int = int(player.get("defense"))
-	var damage: int = maxi(attack - player_defense, 0)
-	player.call("take_damage", damage)
-	attack_timer = 1.0 / maxf(attack_speed, 0.1)
-
-func _update_wander(delta: float) -> void:
+func _move_without_target(delta: float) -> void:
 	if is_idle:
 		direction = Vector2.ZERO
 		idle_timer -= delta
@@ -60,12 +36,10 @@ func _update_wander(delta: float) -> void:
 			_begin_wander()
 		return
 
-	position += direction * speed * delta
-	_clamp_to_map()
+	_queue_movement(direction * speed * delta)
 	wander_timer -= delta
 	if wander_timer <= 0.0:
 		_begin_idle()
-	_update_facing()
 
 func _begin_wander() -> void:
 	is_idle = false
@@ -78,20 +52,6 @@ func _begin_idle() -> void:
 	is_idle = true
 	direction = Vector2.ZERO
 	idle_timer = rng.randf_range(3.0, 4.0)
-
-func _clamp_to_map() -> void:
-	position.x = clampf(position.x, WALK_BOUNDS.position.x, WALK_BOUNDS.end.x)
-	position.y = clampf(position.y, WALK_BOUNDS.position.y, WALK_BOUNDS.end.y)
-
-func _update_facing() -> void:
-	if abs(direction.x) > 0.08:
-		facing = sign(direction.x)
-
-func _find_player() -> Node2D:
-	var players: Array[Node] = get_tree().get_nodes_in_group("player")
-	if players.is_empty() or not players[0] is Node2D:
-		return null
-	return players[0] as Node2D
 
 func _on_defeated() -> void:
 	var game: Node = get_parent()
