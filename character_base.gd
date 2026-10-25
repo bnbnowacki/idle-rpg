@@ -7,6 +7,7 @@ extends Node2D
 
 const WALK_BOUNDS := Rect2(48.0, 70.0, 1056.0, 520.0)
 const ATTACK_RANGE: float = 44.0
+const CAMERA_ZOOM: float = 2.0
 
 @export var speed: float = 72.0
 @export var max_hp: int = 5
@@ -24,6 +25,7 @@ var facing: float = 1.0
 var target: Node2D
 var target_refresh_timer: float = 0.0
 var is_defeated: bool = false
+var visual_scale: float = 1.0 / CAMERA_ZOOM
 
 func _process(delta: float) -> void:
 	if is_defeated:
@@ -127,7 +129,7 @@ func _process_defeated(_delta: float) -> void:
 func _draw() -> void:
 	_draw_visual()
 	# Koniec grafiki postaci. HUD zawsze wraca do normalnej orientacji.
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * visual_scale)
 	_draw_common_hud()
 
 func _draw_visual() -> void:

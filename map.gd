@@ -17,6 +17,8 @@ const TREE_LIGHT := Color("#72bf6e")
 const FLOWER_PINK := Color("#f58fa6")
 const FLOWER_YELLOW := Color("#ffe27a")
 const MOB_SCRIPT = preload("res://mob.gd")
+const TILESET_TEXTURE_PATH := "res://art/tilesets/fairy_tilesheet.png"
+const TILE_SIZE: int = 32
 
 const MOB_SPAWN_POINTS := [
 	Vector2(145, 326), Vector2(318, 170), Vector2(492, 235),
@@ -24,7 +26,7 @@ const MOB_SPAWN_POINTS := [
 	Vector2(1010, 520), Vector2(1008, 145)
 ]
 
-const MAX_MOBS: int = 1
+const MAX_MOBS: int = -1
 var mob_spawn_timer: float = 5.0
 var mob_spawn_index: int = 0
 var coins: int = 0
@@ -34,21 +36,83 @@ var upgrade_buttons: Array[Button] = []
 var combat_log_button: Button
 var combat_log_panel: PanelContainer
 var combat_log_text: TextEdit
+var tile_map_layer: TileMapLayer
+var use_tilemap_background: bool = true
 
 func _ready() -> void:
+	_create_tilemap()
 	_create_hud()
 	_connect_combat_log()
 	queue_redraw()
 
 func _process(delta: float) -> void:
 	mob_spawn_timer -= delta
-	if mob_spawn_timer <= 0.0 and get_tree().get_nodes_in_group("mobs").size() < MAX_MOBS:
+	if mob_spawn_timer <= 0.0 and (MAX_MOBS < 0 or get_tree().get_nodes_in_group("mobs").size() < MAX_MOBS):
 		_spawn_mob()
 		mob_spawn_timer = 5.0
 
 func add_coin(amount: int) -> void:
 	coins += amount
 	_refresh_hud()
+
+func _create_tilemap() -> void:
+	var tileset_image: Image = Image.load_from_file(ProjectSettings.globalize_path(TILESET_TEXTURE_PATH))
+	if tileset_image == null or tileset_image.is_empty():
+		return
+	var tileset_texture: ImageTexture = ImageTexture.create_from_image(tileset_image)
+	if tileset_texture == null:
+		return
+
+	tile_map_layer = TileMapLayer.new()
+	tile_map_layer.name = "FairyTileMap"
+
+	var tile_set: TileSet = TileSet.new()
+	tile_set.tile_size = Vector2i(TILE_SIZE, TILE_SIZE)
+	var atlas: TileSetAtlasSource = TileSetAtlasSource.new()
+	atlas.texture = tileset_texture
+	atlas.texture_region_size = Vector2i(TILE_SIZE, TILE_SIZE)
+	for y in range(8):
+		for x in range(8):
+			atlas.create_tile(Vector2i(x, y))
+	tile_set.add_source(atlas, 0)
+	tile_map_layer.tile_set = tile_set
+	add_child(tile_map_layer)
+	_paint_tilemap_demo()
+
+func _paint_tilemap_demo() -> void:
+	var grass_tiles: Array[Vector2i] = [
+		Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0),
+		Vector2i(3, 0), Vector2i(0, 1), Vector2i(1, 1)
+	]
+	for y in range(-6, 27):
+		for x in range(-10, 46):
+			var variant_index: int = abs(x * 17 + y * 11) % grass_tiles.size()
+			tile_map_layer.set_cell(Vector2i(x, y), 0, grass_tiles[variant_index])
+
+	# Prosty staw z kafelków wody.
+	for y in range(3, 7):
+		for x in range(4, 10):
+			tile_map_layer.set_cell(Vector2i(x, y), 0, Vector2i(0, 4))
+
+	# Główna droga i odchodząca od niej odnoga.
+	for x in range(1, 35):
+		tile_map_layer.set_cell(Vector2i(x, 14), 0, Vector2i(1, 2))
+	for y in range(8, 15):
+		tile_map_layer.set_cell(Vector2i(18, y), 0, Vector2i(3, 2))
+	tile_map_layer.set_cell(Vector2i(18, 14), 0, Vector2i(6, 2))
+
+	# Drzewa są na razie pojedynczymi kafelkami dekoracyjnymi.
+	var tree_positions: Array[Vector2i] = [
+		Vector2i(2, 1), Vector2i(9, 1), Vector2i(16, 1), Vector2i(27, 1),
+		Vector2i(33, 2), Vector2i(2, 17), Vector2i(10, 18), Vector2i(29, 17),
+		Vector2i(34, 7)
+	]
+	var tree_tiles: Array[Vector2i] = [
+		Vector2i(0, 6), Vector2i(1, 6), Vector2i(2, 6), Vector2i(3, 6),
+		Vector2i(4, 6), Vector2i(5, 6), Vector2i(6, 6), Vector2i(7, 6)
+	]
+	for index in range(tree_positions.size()):
+		tile_map_layer.set_cell(tree_positions[index], 0, tree_tiles[index % tree_tiles.size()])
 
 func _create_hud() -> void:
 	var hud_layer: CanvasLayer = CanvasLayer.new()
@@ -268,6 +332,9 @@ func _spawn_mob() -> void:
 	mob_spawn_index += 1
 
 func _draw() -> void:
+	if use_tilemap_background and is_instance_valid(tile_map_layer):
+		return
+
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var scale_factor: float = min(viewport_size.x / MAP_SIZE.x, viewport_size.y / MAP_SIZE.y)
 	var offset: Vector2 = (viewport_size - MAP_SIZE * scale_factor) * 0.5

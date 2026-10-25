@@ -63,9 +63,9 @@ func _draw_visual() -> void:
 	var pulse: float = sin(pulse_time * 3.0) * 1.2
 
 	# Cień.
-	draw_set_transform(Vector2(0.0, 14.0), 0.0, Vector2(1.0, 0.45))
+	draw_set_transform(Vector2(0.0, 14.0 * visual_scale), 0.0, Vector2(visual_scale, 0.45 * visual_scale))
 	draw_circle(Vector2.ZERO, 20.0, Color(0.18, 0.30, 0.22, 0.25))
-	draw_set_transform(Vector2(0.0, pulse), 0.0, Vector2.ONE)
+	draw_set_transform(Vector2(0.0, pulse * visual_scale), 0.0, Vector2.ONE * visual_scale)
 
 	# Jeden uniwersalny, bajkowy potworek.
 	draw_colored_polygon(PackedVector2Array([

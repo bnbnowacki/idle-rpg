@@ -21,6 +21,12 @@ func _ready() -> void:
 	target_scan_range = -1.0
 	target_refresh_interval = 0.2
 	add_to_group("player")
+	var camera: Camera2D = Camera2D.new()
+	camera.name = "PlayerCamera"
+	camera.zoom = Vector2(CAMERA_ZOOM, CAMERA_ZOOM)
+	camera.enabled = true
+	camera.position_smoothing_enabled = false
+	add_child(camera)
 	_choose_direction()
 	queue_redraw()
 
@@ -72,12 +78,12 @@ func _choose_direction() -> void:
 func _draw_visual() -> void:
 	var step: float = sin(walk_time * 9.0) * 3.0
 	var bob: float = abs(sin(walk_time * 9.0)) * 1.2
-	draw_set_transform(Vector2(0.0, bob), 0.0, Vector2(facing, 1.0))
+	draw_set_transform(Vector2(0.0, bob * visual_scale), 0.0, Vector2(facing * visual_scale, visual_scale))
 
 	# Cień.
-	draw_set_transform(Vector2(0.0, 18.0), 0.0, Vector2(facing, 0.45))
+	draw_set_transform(Vector2(0.0, 18.0 * visual_scale), 0.0, Vector2(facing * visual_scale, 0.45 * visual_scale))
 	draw_circle(Vector2.ZERO, 20.0, Color(0.18, 0.30, 0.22, 0.28))
-	draw_set_transform(Vector2(0.0, bob), 0.0, Vector2(facing, 1.0))
+	draw_set_transform(Vector2(0.0, bob * visual_scale), 0.0, Vector2(facing * visual_scale, visual_scale))
 
 	# Peleryna.
 	draw_colored_polygon(PackedVector2Array([
