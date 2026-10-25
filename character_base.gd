@@ -26,6 +26,7 @@ var target: Node2D
 var target_refresh_timer: float = 0.0
 var is_defeated: bool = false
 var visual_scale: float = 1.0 / CAMERA_ZOOM
+var current_defense: int = 1
 
 func _process(delta: float) -> void:
 	if is_defeated:
@@ -33,7 +34,10 @@ func _process(delta: float) -> void:
 		queue_redraw()
 		return
 
+	var cooldown_was_active: bool = attack_timer > 0.0
 	attack_timer = maxf(attack_timer - delta, 0.0)
+	if cooldown_was_active and attack_timer <= 0.0:
+		_restore_defense()
 	_update_target(delta)
 	if is_instance_valid(target):
 		var target_distance: float = global_position.distance_to(target.global_position)
@@ -110,12 +114,12 @@ func _update_facing() -> void:
 func _try_attack_target() -> void:
 	if attack_timer > 0.0 or not _is_valid_target(target):
 		return
-	var target_defense: Variant = target.get("defense")
-	if target_defense == null:
-		return
-	var damage: int = maxi(attack - int(target_defense), 0)
-	_queue_attack(target, damage)
+	_queue_attack(target)
 	attack_timer = 1.0 / maxf(attack_speed, 0.1)
+
+func _restore_defense() -> void:
+	current_defense = defense
+	queue_redraw()
 
 func _move_without_target(_delta: float) -> void:
 	pass
@@ -144,10 +148,10 @@ func take_damage(amount: int) -> void:
 		_on_defeated()
 	queue_redraw()
 
-func _queue_attack(target: Node, damage: int) -> void:
+func _queue_attack(target: Node) -> void:
 	var combat_system: Node = get_node_or_null("/root/CombatSystem")
 	if combat_system != null:
-		combat_system.call("queue_attack", self, target, damage)
+		combat_system.call("queue_attack", self, target)
 
 func _can_receive_damage() -> bool:
 	return visible and not is_defeated and hp > 0
@@ -173,6 +177,9 @@ func _draw_common_hud() -> void:
 	var hp_font_size: int = _get_debug_hp_font_size()
 	draw_string(font, hp_text_position + Vector2(1.0, 1.0), str(hp), HORIZONTAL_ALIGNMENT_RIGHT, hp_text_width, hp_font_size, Color("#6b2d32"))
 	draw_string(font, hp_text_position, str(hp), HORIZONTAL_ALIGNMENT_RIGHT, hp_text_width, hp_font_size, Color("#e85353"))
+	var defense_text_position: Vector2 = hp_text_position + Vector2(hp_text_width + 4.0, 0.0)
+	draw_string(font, defense_text_position + Vector2(1.0, 1.0), str(current_defense), HORIZONTAL_ALIGNMENT_LEFT, hp_text_width, hp_font_size, Color("#183d76"))
+	draw_string(font, defense_text_position, str(current_defense), HORIZONTAL_ALIGNMENT_LEFT, hp_text_width, hp_font_size, Color("#4f8fe8"))
 
 	if attack_timer <= 0.0:
 		return
@@ -197,7 +204,7 @@ func _get_debug_hp_font_size() -> int:
 	return 16
 
 func _get_debug_ring_center() -> Vector2:
-	return Vector2(0.0, -62.0)
+	return Vector2(16.0, -62.0)
 
 func _get_debug_ring_radius() -> float:
 	return 12.0

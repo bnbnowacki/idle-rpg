@@ -17,6 +17,7 @@ var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 func _ready() -> void:
 	rng.seed = int(Time.get_ticks_msec()) + int(position.x * 31.0) + int(position.y * 17.0)
 	hp = max_hp
+	current_defense = defense
 	target_group = &"player"
 	target_scan_range = AGGRO_RANGE
 	target_refresh_interval = 0.2
@@ -103,7 +104,7 @@ func _get_debug_hp_font_size() -> int:
 	return 15
 
 func _get_debug_ring_center() -> Vector2:
-	return Vector2(0.0, -51.0)
+	return Vector2(16.0, -51.0)
 
 func _get_debug_ring_radius() -> float:
 	return 10.0

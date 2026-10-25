@@ -17,6 +17,7 @@ var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 func _ready() -> void:
 	rng.seed = 73421
 	hp = max_hp
+	current_defense = defense
 	target_group = &"mobs"
 	target_scan_range = -1.0
 	target_refresh_interval = 0.2
@@ -60,6 +61,7 @@ func _process_defeated(delta: float) -> void:
 func _respawn() -> void:
 	is_defeated = false
 	hp = max_hp
+	current_defense = defense
 	position = Vector2(
 		rng.randf_range(WALK_BOUNDS.position.x, WALK_BOUNDS.end.x),
 		rng.randf_range(WALK_BOUNDS.position.y, WALK_BOUNDS.end.y)
@@ -134,7 +136,7 @@ func _get_debug_hp_text_width() -> float:
 	return 32.0
 
 func _get_debug_ring_center() -> Vector2:
-	return Vector2(0.0, -62.0)
+	return Vector2(16.0, -62.0)
 
 func _get_debug_ring_radius() -> float:
 	return 12.0

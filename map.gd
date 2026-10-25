@@ -286,7 +286,9 @@ func _on_upgrade_pressed(index: int) -> void:
 		0:
 			knight.set("attack", int(knight.get("attack")) + 1)
 		1:
-			knight.set("defense", int(knight.get("defense")) + 1)
+			var new_defense: int = int(knight.get("defense")) + 1
+			knight.set("defense", new_defense)
+			knight.set("current_defense", new_defense)
 		2:
 			knight.set("max_hp", int(knight.get("max_hp")) + 1)
 			knight.set("hp", mini(int(knight.get("hp")) + 1, int(knight.get("max_hp"))))

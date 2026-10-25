@@ -2,8 +2,7 @@ extends Node
 
 signal combat_log_entry(frame_number: int, lines: Array)
 
-## Rozlicza wszystkie ataki zakolejkowane w bieżącej klatce.
-## Wysoki priorytet sprawia, że system działa po postaciach.
+## Resolves queued movement and attacks after all actors finish their _process().
 
 var pending_attacks: Array[Dictionary] = []
 var pending_movements: Array[Dictionary] = []
@@ -11,7 +10,7 @@ var pending_movements: Array[Dictionary] = []
 func _ready() -> void:
 	process_priority = 1000
 
-func queue_attack(attacker: Node, target: Node, damage: int) -> void:
+func queue_attack(attacker: Node, target: Node) -> void:
 	if not is_instance_valid(attacker) or not is_instance_valid(target):
 		return
 	if not target.has_method("take_damage"):
@@ -19,7 +18,6 @@ func queue_attack(attacker: Node, target: Node, damage: int) -> void:
 	pending_attacks.append({
 		"attacker": attacker,
 		"target": target,
-		"damage": damage,
 		"frame": Engine.get_process_frames()
 	})
 
@@ -49,38 +47,41 @@ func _process(_delta: float) -> void:
 	pending_attacks.clear()
 	var frame_number: int = int(attacks_to_resolve[0]["frame"])
 	var log_lines: Array[String] = []
-	for attack_event in attacks_to_resolve:
-		log_lines.append("%s - %d HP - %s" % [
-			_get_combatant_type(attack_event["attacker"]),
-			int(attack_event["damage"]),
-			_get_combatant_type(attack_event["target"])
-		])
-	emit_signal("combat_log_entry", frame_number, log_lines)
 
-	var damage_by_target: Dictionary = {}
-
-	# Wszystkie ataki z tego ticka są zebrane przed zastosowaniem obrażeń.
+	# Resolve attacks in queue order because each hit can reduce the target's defense.
 	for attack_event in attacks_to_resolve:
+		var attacker = attack_event["attacker"]
 		var target = attack_event["target"]
-		if not is_instance_valid(target) or not target.has_method("take_damage"):
+		if not is_instance_valid(attacker):
+			continue
+		if not is_instance_valid(target):
+			continue
+		if not target.has_method("take_damage"):
 			continue
 
-		var target_id: int = target.get_instance_id()
-		if not damage_by_target.has(target_id):
-			damage_by_target[target_id] = {
-				"target": target,
-				"damage": 0
-			}
-		var target_event: Dictionary = damage_by_target[target_id]
-		target_event["damage"] = int(target_event["damage"]) + int(attack_event["damage"])
-		damage_by_target[target_id] = target_event
+		var damage: int = 0
+		var can_receive_damage: bool = true
+		if target.has_method("_can_receive_damage"):
+			can_receive_damage = bool(target.call("_can_receive_damage"))
+		if can_receive_damage:
+			var attacker_attack: Variant = attacker.get("attack")
+			var target_defense: Variant = target.get("current_defense")
+			if attacker_attack == null or target_defense == null:
+				continue
+			var attacker_attack_value: int = int(attacker_attack)
+			var target_defense_value: int = int(target_defense)
+			damage = maxi(attacker_attack_value - target_defense_value, 0)
+			target.set("current_defense", maxi(target_defense_value - attacker_attack_value, 0))
+			target.call("take_damage", damage)
 
-	# Teraz dopiero odpalają się take_damage() i efekty śmierci.
-	for target_id in damage_by_target:
-		var target_event: Dictionary = damage_by_target[target_id]
-		var target = target_event["target"]
-		if is_instance_valid(target):
-			target.call("take_damage", int(target_event["damage"]))
+		log_lines.append("%s - %d HP - %s" % [
+			_get_combatant_type(attacker),
+			damage,
+			_get_combatant_type(target)
+		])
+
+	if not log_lines.is_empty():
+		emit_signal("combat_log_entry", frame_number, log_lines)
 
 func _get_combatant_type(actor) -> String:
 	if not is_instance_valid(actor):
