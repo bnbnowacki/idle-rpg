@@ -1,0 +1,12 @@
+[gd_scene load_steps=3 format=3 uid="uid://dtjxkt2seugjw"]
+
+[ext_resource type="Script" path="res://map.gd" id="1_map"]
+[ext_resource type="Script" path="res://knight.gd" id="2_knight"]
+
+[node name="Node2D" type="Node2D" unique_id=1056761665]
+script = ExtResource("1_map")
+
+[node name="Knight" type="Node2D" parent="."]
+position = Vector2(560, 390)
+z_index = 10
+script = ExtResource("2_knight")
